@@ -16,12 +16,25 @@ led_strobe_hz = 10
 video_resolution = (1920, 1080)
 
 
-""" MOTION DETECT PARAMETERS """
+""" NEURAL NET PARAMETERS...RIP"""
+train_path = 'assets/training.csv'
+test_path  = 'assets/testing.csv'
+batch_size = 5      # Smaller is more accurate but slower to train
+net_layers = [20, 6]    # Guess? idfk
+net_epochs = 1000    # Larger is more accurate?
+net_learnrate = 0.0001
 
 
+""" IM SMAHTER THAN NEURAL NET PARAMETERS """
+changes_thresh = 7
+idle_sum_thresh = 50
+peck_sum_thresh = 65
+score_inc = 0.01
 
-""" OBJECT DETECT PARAMETERS """
 
+""" TIME TRIAL PARAMETERS """
+thresh_times = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 10]
+thresh_increment = 5
 
 
 """ CHOPPING PARAMETERS """
@@ -32,7 +45,7 @@ dice_spacing_mm = 5
 
 
 """ AUDIO STUFF """
-audio_path = 'media'
+audio_path = 'assets'
 audio_catagories = {
     'tea': 'tea',
     'chop': 'chop',

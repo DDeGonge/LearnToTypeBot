@@ -43,33 +43,28 @@ class Speaker(object):
         pg.mixer.music.load(os.path.join(cfg.audio_path, track))
         pg.mixer.music.play()
 
+    def play_file(self, track):
+        if pg.mixer.music.get_busy():
+            self.stop()
+
+        pg.mixer.music.load(os.path.join(cfg.audio_path, track))
+        pg.mixer.music.play()
+
     def wait_for_sound_to_end(self):
         while pg.mixer.music.get_busy():
             time.sleep(0.1)
 
-    def play_tea(self):
-        self._play_track('tea')
+    def stop(self):
+        pg.mixer.music.stop()
 
-    def play_chop(self):
-        self._play_track('chop')
+    def play_reee(self):
+        self.play_file('reee.mp3')
 
-    def play_thud(self):
-        self._play_track('thud')
+    def play_fitness_intro(self):
+        self.play_file('fitness.mp3')
 
-    def play_safety_start(self):
-        self._play_track('safes')
-
-    def play_safety_end(self):
-        self._play_track('safen')
-
-    def play_scorereq(self):
-        self._play_track('score')
-
-    def play_sarcasm(self):
-        self._play_track('oops')
-
-    def play_thanks(self):
-        self._play_track('thank')
+    def play_speedup(self):
+        self.play_file('speedup.mp3')
 
 
 if __name__=='__main__':

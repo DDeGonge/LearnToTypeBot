@@ -23,8 +23,6 @@ class Camera(object):
         self.pic_type = ''
 
         self.empty_scene = None
-        self.reddit_template = cv2.imread(cfg.reddit_path,0)
-        self.reddit_template = cv2.Canny(self.reddit_template, cfg.canny_min, cfg.canny_max)
 
 
     @staticmethod
@@ -213,27 +211,6 @@ class Camera(object):
             [a, b, c, d] = faces[0]
             return (a, b, c, d)
         return None
-
-    def is_reddit_there(self):
-        method = cv2.TM_CCOEFF
-        frame_edged = cv2.Canny(self.get_frame(), cfg.canny_min, cfg.canny_max)
-        res = cv2.matchTemplate(frame_edged, self.reddit_template, method)
-        (_, maxVal, _, maxLoc) = cv2.minMaxLoc(res)
-        if cfg.DEBUG_MODE:
-            print(maxVal)
-            # for pt in zip(*loc[::-1]):
-            #     print(pt[0], pt[1])
-
-
-        if maxVal > cfg.template_thresh:
-            return True
-        return False
-
-    def show_frame(self, frame):
-        (w,h) = self.resolution
-        frame.shape = (h,w) # set the correct dimensions for the numpy array
-        cv2.imshow("skrrt", frame)
-
 
 if __name__=='__main__':
     c = Camera()
