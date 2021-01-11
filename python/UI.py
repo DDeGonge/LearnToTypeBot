@@ -1,8 +1,10 @@
 import pygame
 import random
 import time
+import os
 import Config as cfg
 
+os.putenv('SDL_FBDEV', '/dev/fb1')
 pygame.init()
 
 class WordGenerator():
@@ -118,6 +120,7 @@ class Homescreen(Page):
         self.reset()
 
     def reset(self):
+        self.speaker.stop()
         pass
 
     def display_screen(self, screen):
@@ -188,10 +191,10 @@ class TypeGame(Page):
         elif not self.hardmode and not self.accuracymode:
             self.rwg = WordGenerator('assets/words.txt', maxlen=7)
 
-        self.reset()
+        self.reset(skip_sounds=True)
         self.fill_word_buffer()
 
-    def reset(self):
+    def reset(self, skip_sounds=False):
         self.current_word = self.rwg.get_word()
         self.typed_word = ''
         self.next_words = []
@@ -204,7 +207,9 @@ class TypeGame(Page):
         self.thresh_index = 0
 
         self.start_time = None
-        self.speaker.play_fitness_intro()
+
+        if not skip_sounds:
+            self.speaker.play_fitness_intro()
 
     def display_screen(self, screen):
         for b in self.buttons.values():

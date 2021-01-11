@@ -1,13 +1,15 @@
+#!/usr/bin/env python3
+
 __version__ = '0.1.0'
 
 import time
 import argparse
 import Config as cfg
 # from CameraDriver import *
-# from SpeakerDriver import *
+from SpeakerDriver import *
 from HWDriver import *
-# from NeuralNet import *
-# from UI import *
+from NeuralNet import *
+from UI import *
 
 
 def main():
@@ -31,9 +33,9 @@ def main_ui():
 
     # try:
     s = Speaker()
-    c = Camera()
-    k = KeyboardSensor()
-    c.start()
+    # c = Camera()
+    k = KeyboardSensor(skip_neural=True)
+    # c.start()
 
 
     # Enter operational mode
@@ -84,7 +86,21 @@ def main_ui():
         active_screen.display_screen(screen)
 
         pygame.display.update()
-        clock.tick(60)
+        clock.tick(5)
+
+def uitest():
+    screen = pygame.display.set_mode((450, 300))
+    screen.fill((0,255,255))
+    clock = pygame.time.Clock()
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+        pygame.display.update()
+        clock.tick(5)
+    
 
 def print_sensors():
     # ledobj = LEDs()
@@ -92,15 +108,11 @@ def print_sensors():
     #     _ = input("EEEEEEE: ")
     #     ledobj.strobe(3)
     kbs = KeyboardSensor()
+    kbs.start_sensor_polling()
     while True:
         print(kbs.read_sensors())
+        kbs.update_score_neural()
         time.sleep(0.1)
-
-# def NN_model_test():
-#     # Neural net setup and training
-#     NN = NeuralNet(batch_size=cfg.batch_size, layers=cfg.net_layers, learnrate=cfg.net_learnrate, epochs=cfg.net_epochs)
-#     NN.TrainModelByPath(cfg.train_path)
-#     print(NN.TestModelByPath(cfg.test_path))
 
 def strobe():
     l = LEDs()
@@ -125,9 +137,9 @@ def record():
         newfile.close()
 
 if __name__=='__main__':
-    # NN_model_test()
+    # uitest()
     # main_ui()
     # main()
-    record()
+    # record()
     # strobe()
-    # print_sensors()
+    print_sensors()

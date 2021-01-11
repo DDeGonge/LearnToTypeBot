@@ -1,7 +1,7 @@
 """ PI PINOUTS """
 SHOCK_PIN = 4                           # OUTPUT
-LED_PINS = [17, 27]                       # OUTPUT
-SENSE_PINS = [16, 20, 12, 23, 24, 7, 8, 25]   # INPUT
+LED_PINS = [15, 27]                       # OUTPUT
+SENSE_PINS = [26, 20, 13, 6, 5, 16, 12, 23]   # INPUT
 
 
 """ OPERATION PARAMETERS """
@@ -19,10 +19,15 @@ video_resolution = (1920, 1080)
 """ NEURAL NET PARAMETERS...RIP"""
 train_path = 'assets/training.csv'
 test_path  = 'assets/testing.csv'
-batch_size = 5      # Smaller is more accurate but slower to train
-net_layers = [20, 6]    # Guess? idfk
+model_path = 'assets/NeuralModel.h5'
+in_len = 50
+out_len = 2
+net_layers = [4, 2]    # Guess? idfk
 net_epochs = 1000    # Larger is more accurate?
-net_learnrate = 0.0001
+net_learnrate = 0.01
+
+active_thresh = 0.7
+pecking_thresh = 0.5
 
 
 """ IM SMAHTER THAN NEURAL NET PARAMETERS """

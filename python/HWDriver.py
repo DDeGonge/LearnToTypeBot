@@ -1,6 +1,8 @@
 __version__ = '0.1.0'
 
 from gpiozero import Button, LED
+from NeuralNet import *
+import numpy as np
 import threading
 import Config as cfg
 import os
@@ -9,12 +11,16 @@ import math
 
 
 class KeyboardSensor(object):
-    def __init__(self):
+    def __init__(self, skip_neural=False):
         self.sensors = [Button(i) for i in cfg.SENSE_PINS]
         self.buffer_size = cfg.window_update_hz * cfg.window_size_s
         self.buffer = [0x00] * self.buffer_size
         self.idle = True
         self.score = 0.5
+
+        if not skip_neural:
+            self.neuralModel = NeuralNet(model_path=cfg.model_path)
+            self.neuralModel.load_weights()
 
     def read_sensors(self):
         return [s.is_pressed for s in self.sensors]
@@ -35,6 +41,20 @@ class KeyboardSensor(object):
     def stop_sensor_polling(self):
         self.kill_logging.set()
         self.logthread.join()
+
+    def update_score_neural(self):
+        x = [int(str(i), 16) for i in self.buffer]
+        x = np.array([x])
+        # print(self.buffer, x)
+        [[active, pecking]] = self.neuralModel.Predict([x])
+        print(active, pecking)
+
+        if active > cfg.active_thresh:
+            if pecking > cfg.pecking_thresh:
+                self.score -= cfg.score_inc
+            else:
+                self.score += cfg.score_inc
+            self.normalize_score()
 
     def update_score(self):
         ints = [int(str(i), 16) for i in self.buffer]
@@ -64,6 +84,9 @@ class KeyboardSensor(object):
             self.idle = False
             self.score += cfg.score_inc
 
+        self.normalize_score()
+
+    def normalize_score(self):
         self.score = 0 if self.score <= 0 else self.score
         self.score = 1 if self.score >= 1 else self.score
 
