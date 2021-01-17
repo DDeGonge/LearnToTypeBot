@@ -102,16 +102,16 @@ class Homescreen(Page):
         'learn': Button('assets/home_learn.png', 75, 150),
         'timetrial': Button('assets/home_timetrial.png', 150, 150),
         'hardtimetrial': Button('assets/home_hardtimetrial.png', 225, 150),
-        'accuracy': Button('assets/home_accuracy.png', 300, 150),
-        'dumb': Button('assets/home_accuracy.png', 375, 150),
+        'endless': Button('assets/home_accuracy.png', 300, 150),
+        'dumb': Button('assets/dingding.png', 375, 150),
     }
     text = {
         'title': Text("Learn To Type!", 225, 30, fsize=36, color=(0,0,0)),
         'subtitle': Text("or else...", 225, 60, fsize=12, color=(0,0,0)),
         'learn': Text("Practice", 75, 200, fsize=12, color=(0,0,0)),
-        'timetrial': Text("Time Trial (ez)", 150, 200, fsize=12, color=(0,0,0)),
-        'hardtimetrial': Text("Time Trial (hard)", 225, 200, fsize=12, color=(0,0,0)),
-        'accuracy': Text("Hardcore Mode", 300, 200, fsize=12, color=(0,0,0)),
+        'timetrial': Text("Time Trial", 150, 200, fsize=12, color=(0,0,0)),
+        'hardtimetrial': Text("Hardcore Mode", 225, 200, fsize=12, color=(0,0,0)),
+        'endless': Text("Endless Mode", 300, 200, fsize=12, color=(0,0,0)),
         'dumb': Text("Ding-Ding!", 375, 200, fsize=12, color=(0,0,0))
     }
 
@@ -141,23 +141,41 @@ class Learn(Page):
     buttons = {
         'back': Button('assets/back.png', 30, 42)
     }
-    meter = Meter('assets/speedometer.png', 'assets/arrow.png', 225, 150, (2, 32), (0, 32), minang=-70, maxang=70)
+    meter = Meter('assets/speedometer.png', 'assets/arrow.png', 225, 150, (2, 32), (0, 32), minang=-90, maxang=90)
 
-    def __init__(self, s, k):
+    def __init__(self, s, k, l, z):
         self.speaker = s
         self.keybot = k
+        self.leds = l
+        self.zapper = z
         self.keybot.start_sensor_polling()
+        self.recent_scores = [0.5]*10
+        self.recent_i = 0
         self.reset()
 
     def reset(self):
+        self.keybot.set_score(0.5)
         self.keybot.start_sensor_polling()
+
 
     def display_screen(self, screen):
         for b in self.buttons.values():
             b.draw(screen)
-        # self.meter.update_value(self.keybot.get_score())
-        self.meter.update_value(0)
+        self.keybot.update_score_neural()
+        newscore = self.keybot.get_score()
+        self.meter.update_value(self.keybot.get_score())
         self.meter.draw(screen)
+
+        # Check if LEDs must be strobed or zappers must be charged
+        self.recent_scores[self.recent_i] = newscore
+        self.recent_i += 1
+        self.recent_i %= len(self.recent_scores)
+
+        if self.recent_i == 0 and (self.recent_scores[-1] - self.recent_scores[0]) < -0.05 and self.leds.time_passed(cfg.strobe_warn_off_s):
+            self.leds.strobe(cfg.strobe_warn_on_s)
+
+        if newscore < 0.1 and self.zapper.time_passed(cfg.zaptime_s * 3):
+            self.zapper.zap_it(cfg.zaptime_s)
 
     def event_handler(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -178,10 +196,13 @@ class TypeGame(Page):
     acc_title = font.render("ACCURACY:", True, (0, 0, 0))
     tar_title = font.render("WPM TARGET:", True, (0, 0, 0))
 
-    def __init__(self, s, hard_words, accuracy_mode):
+    def __init__(self, s, l, z, hard_words, accuracy_mode):
         self.hardmode = hard_words
         self.accuracymode = accuracy_mode
         self.speaker = s
+        self.leds = l
+        self.zapper = z
+        
 
         # Initialize random word generator based on test type
         if self.hardmode:
@@ -205,10 +226,13 @@ class TypeGame(Page):
         self.words_incorrect = 0
         self.thresh = 0
         self.thresh_index = 0
+        self.strikes = 0
+        self.correct_word_history = []
 
         self.start_time = None
+        self.gameover = False
 
-        if not skip_sounds:
+        if not skip_sounds and not self.accuracymode:
             self.speaker.play_fitness_intro()
 
     def display_screen(self, screen):
@@ -243,33 +267,65 @@ class TypeGame(Page):
             screen.blit(img, (letter_pos_x, user_letter_y))
             letter_pos_x += letter_spacing
 
-        # Display accuracy and WPM if game is started
-        if self.start_time is not None:
-            wpm_color = (0,0,0) if self.wpm > self.thresh else (255,0,0)
-            wpm_img = self.font.render(str(int(self.wpm)), True, wpm_color)
-            acc_img = self.font.render(str(int(100 * self.accuracy)), True, (0, 255*self.accuracy, 0))
-            tar_img = self.font.render(str(int(self.thresh)), True, (0,0,0))
-            screen.blit(wpm_img, (400, 5))
-            screen.blit(self.wpm_title, (400 - 10 - self.wpm_title.get_size()[0], 5))
-            screen.blit(acc_img, (400, 35))
-            screen.blit(self.acc_title, (400 - 10 - self.acc_title.get_size()[0], 35))
-            screen.blit(tar_img, (230, 20))
-            screen.blit(self.tar_title, (230 - 10 - self.tar_title.get_size()[0], 20))
+        if self.gameover is False:
+            # Display accuracy and WPM if game is started
+            if self.start_time is not None:
+                wpm_color = (0,0,0) if (self.wpm > self.thresh or self.accuracymode) else (255,0,0)
+                wpm_img = self.font.render(str(int(self.wpm)), True, wpm_color)
+                acc_img = self.font.render(str(int(100 * self.accuracy)), True, (0, 255*self.accuracy, 0))
+                tar_img = self.font.render(str(int(self.thresh)), True, (0,0,0))
+                screen.blit(wpm_img, (400, 5))
+                screen.blit(self.wpm_title, (400 - 10 - self.wpm_title.get_size()[0], 5))
+                screen.blit(acc_img, (400, 35))
+                screen.blit(self.acc_title, (400 - 10 - self.acc_title.get_size()[0], 35))
+                if not self.accuracymode:
+                    screen.blit(tar_img, (230, 20))
+                    screen.blit(self.tar_title, (230 - 10 - self.tar_title.get_size()[0], 20))
 
-        # Some periodic test related stuff
-        if self.time_elapsed > cfg.thresh_times[self.thresh_index]:
-            if self.wpm < self.thresh:
-                print('Fun time...')
+                if self.thresh_index > 1 and self.leds.time_passed(cfg.strobe_warn_off_s) and self.wpm < self.thresh:
+                    self.leds.strobe(cfg.strobe_warn_on_s)
 
-            self.thresh_index += 1
-            self.thresh += cfg.thresh_increment
-            self.speaker.play_speedup()
+            # Some periodic test related stuff
+            if not self.accuracymode and self.time_elapsed > cfg.thresh_times[self.thresh_index]:
+                if self.wpm < self.thresh and self.zapper.time_passed(cfg.zaptime_s):
+                    self.zapper.zap_it(cfg.zaptime_s)
+                    self.strikes += 1
+                    self.speaker.play_strike()
+                    if self.strikes >= 3:
+                        self.speaker.play_loser()
+                        self.gameover = True
+                        self.score_primer = Text('SCORE', 240, 100, fsize=36)
+                        self.score_text = Text(str(self.words_correct), 240, 140, fsize=24)
+                        self.accuracy_text = Text('{}% ACCURACY'.format(self.accuracy), 240, 180, fsize=24)
+                
+                if self.wpm < self.thresh:
+                    self.speaker.play_strike()
+                else:
+                    self.speaker.play_speedup()
+                
+                self.thresh_index += 1
+                self.thresh += cfg.thresh_increment
+        else:
+            rect_overlay_size = (300,200)
+            l_offset = (480 - rect_overlay_size[0]) / 2
+            h_offset = (360 - rect_overlay_size[1]) / 2
+            pygame.draw.rect(screen, (0,0,0), pygame.Rect((l_offset, h_offset), rect_overlay_size))
+            self.score_primer.draw()
+            self.score_text.draw()
+            self.accuracy_text.draw()
+
 
     def correct_input(self):
         self.words_correct += 1
+        self.correct_word_history.append(time.time())
 
     def incorrect_input(self):
         self.words_incorrect += 1
+        if self.leds.time_passed(1):
+            self.leds.strobe(0.2)
+        if self.accuracymode and self.zapper.time_passed(cfg.zaptime_s):
+            self.zapper.zap_it(cfg.zaptime_s)
+
 
     def increment_buffer(self):
         self.typed_word = ''
@@ -309,6 +365,10 @@ class TypeGame(Page):
         while len(self.next_words) < 5:
             self.next_words.append(self.rwg.get_word())
 
+    def delete_expired_correct_words(self):
+        tmax = time.time() - cfg.wpm_window_s
+        self.correct_word_history = [w for w in self.correct_word_history if w > tmax]
+
     @property
     def accuracy(self):
         wordcount = (self.words_correct + self.words_incorrect)
@@ -316,8 +376,9 @@ class TypeGame(Page):
 
     @property
     def wpm(self):
-        timeelapsed = (time.time() - self.start_time)
-        return 0 if timeelapsed == 0 else 60 * self.words_correct / timeelapsed
+        self.delete_expired_correct_words()
+        timeelapsed = min((time.time() - self.start_time), cfg.wpm_window_s)
+        return 0 if timeelapsed == 0 else 60 * len(self.correct_word_history) / timeelapsed
 
     @property
     def time_elapsed(self):

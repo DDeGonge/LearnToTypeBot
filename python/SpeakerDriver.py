@@ -66,6 +66,12 @@ class Speaker(object):
     def play_speedup(self):
         self.play_file('speedup.mp3')
 
+    def play_loser(self):
+        self.play_file('loser.mp3')
+
+    def play_strike(self):
+        self.play_file('strike.mp3')
+
 
 if __name__=='__main__':
     s = Speaker()

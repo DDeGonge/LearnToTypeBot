@@ -34,7 +34,9 @@ def main_ui():
     # try:
     s = Speaker()
     # c = Camera()
-    k = KeyboardSensor(skip_neural=True)
+    k = KeyboardSensor(skip_neural=False)
+    l = LEDs()
+    z = Zapper()
     # c.start()
 
 
@@ -44,23 +46,24 @@ def main_ui():
 
     # Set up window
     screen = pygame.display.set_mode((450, 300))
+    # pygame.display.set_mode((0, 0),pygame.FULLSCREEN)
     pygame.display.set_caption("Learn To Type!")
     pygame.display.set_icon(pygame.image.load('assets/icon.png'))
     clock = pygame.time.Clock()
 
     # Initialize all screens
     s_homescreen = Homescreen(s)
-    s_learn = Learn(s, k)
-    s_timetrial = TypeGame(s, hard_words=False, accuracy_mode=False)
-    s_hardtimetrial = TypeGame(s, hard_words=True, accuracy_mode=False)
-    s_accuracy = TypeGame(s, hard_words=False, accuracy_mode=True)
+    s_learn = Learn(s, k, l, z)
+    s_timetrial = TypeGame(s, l, z, hard_words=False, accuracy_mode=False)
+    s_hardtimetrial = TypeGame(s, l, z, hard_words=True, accuracy_mode=False)
+    s_accuracy = TypeGame(s, l, z, hard_words=False, accuracy_mode=True)
     s_dumb = Dumb(s)
 
     # Add page connections
     s_homescreen.attach_action_to_button('learn', s_learn)
     s_homescreen.attach_action_to_button('timetrial', s_timetrial)
     s_homescreen.attach_action_to_button('hardtimetrial', s_hardtimetrial)
-    s_homescreen.attach_action_to_button('accuracy', s_accuracy)
+    s_homescreen.attach_action_to_button('endless', s_accuracy)
     s_homescreen.attach_action_to_button('dumb', s_dumb)
 
     # Attach back buttons to all pages
@@ -87,19 +90,6 @@ def main_ui():
 
         pygame.display.update()
         clock.tick(5)
-
-def uitest():
-    screen = pygame.display.set_mode((450, 300))
-    screen.fill((0,255,255))
-    clock = pygame.time.Clock()
-
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-        pygame.display.update()
-        clock.tick(5)
     
 
 def print_sensors():
@@ -110,9 +100,10 @@ def print_sensors():
     kbs = KeyboardSensor()
     kbs.start_sensor_polling()
     while True:
-        print(kbs.read_sensors())
+        # print(kbs.read_sensors())
         kbs.update_score_neural()
-        time.sleep(0.1)
+        print(kbs.get_score())
+        time.sleep(0.04)
 
 def strobe():
     l = LEDs()
@@ -132,14 +123,13 @@ def record():
             vals = [0] + kbs.buffer_dump()
             print(vals)
             csvfile.writerow(vals)
-            time.sleep(0.1)
+            time.sleep(0.04)
     finally:
         newfile.close()
 
 if __name__=='__main__':
-    # uitest()
-    # main_ui()
+    main_ui()
     # main()
     # record()
     # strobe()
-    print_sensors()
+    # print_sensors()

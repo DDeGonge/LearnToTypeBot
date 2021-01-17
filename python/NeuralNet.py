@@ -19,7 +19,7 @@ output, input1, input2, ..., inputN
 class NeuralNet(object):
     def __init__(self, layers = cfg.net_layers,
                        learnrate = cfg.net_learnrate,
-                       epochs = cfg.net_learnrate,
+                       epochs = cfg.net_epochs,
                        in_len = cfg.in_len,
                        out_len = cfg.out_len,
                        model_path = cfg.model_path):
@@ -53,6 +53,7 @@ class NeuralNet(object):
         y = [[int(r) for r in v] for v in y]
         x = data[:, self.out_len:]
         x = [[int(r, 16) for r in v] for v in x]
+        x = [self.PreProccess(i) for i in x]
         return x, y
     
     def TrainModelByPath(self, filepath):
@@ -63,6 +64,29 @@ class NeuralNet(object):
         x, y = self.ImportData(filepath)
         return self.TestModel(x, y)
 
+    def PreProccess(self, indata):
+        l = [int(k / 16) for k in indata]
+        r = [k % 16 for k in indata]
+        last = [l[0], r[0]]
+        outarr = [0, 0, 0, 0, 0, 0, 0, 0]
+        for lp, rp in zip(l, r):
+            if lp != last[0]:
+                outarr[0] += 1
+            if rp != last[1]:
+                outarr[1] += 1
+            last = [lp, rp]
+
+        outarr[2] = sum(l)
+        outarr[3] = sum(r)
+
+        outarr[4] = min(l)
+        outarr[5] = min(r)
+
+        outarr[6] = max(l)
+        outarr[7] = max(r)
+
+        return outarr
+
     def PrintWeights(self):
         print("Weights:",self.model.get_weights())
 
@@ -70,7 +94,9 @@ class NeuralNet(object):
         plot_model(self.model, to_file=imgpath)
 
     def Predict(self, data_in):
-        return self.model.predict(data_in)
+        x = np.array([self.PreProccess(data_in)])
+        [[retval]] = self.model.predict(x)
+        return retval, x[0,0] + x[0,1] / 2
 
     def save_model(self):
         self.model.save(self.model_path)
@@ -88,8 +114,6 @@ class NeuralNet(object):
 def main(in_args):
     # Check that in and out lengths add up <- I wrote this comment a long time ago but wtf does this mean...?
     NNET = NeuralNet()
-    # NNET.load_model()
-    # NNET.PrintWeights()
     NNET.TrainModelByPath(in_args[0])
     NNET.save_model()
     if len(in_args) > 1:

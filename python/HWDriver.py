@@ -17,6 +17,7 @@ class KeyboardSensor(object):
         self.buffer = [0x00] * self.buffer_size
         self.idle = True
         self.score = 0.5
+        self.last_NN_outputs = None
 
         if not skip_neural:
             self.neuralModel = NeuralNet(model_path=cfg.model_path)
@@ -35,7 +36,7 @@ class KeyboardSensor(object):
     def start_sensor_polling(self):
         self.score = 0.5
         self.kill_logging = threading.Event()
-        self.logthread = threading.Thread(target=self.update_buffer, daemon=True)
+        self.logthread = threading.Thread(target=self.update_buffer)#, daemon=True)
         self.logthread.start()
 
     def stop_sensor_polling(self):
@@ -43,24 +44,21 @@ class KeyboardSensor(object):
         self.logthread.join()
 
     def update_score_neural(self):
-        x = [int(str(i), 16) for i in self.buffer]
-        x = np.array([x])
-        # print(self.buffer, x)
-        [[active, pecking]] = self.neuralModel.Predict([x])
-        print(active, pecking)
+        buffer_ints = [int(str(r), 16) for r in self.buffer]
+        pecking, active = self.neuralModel.Predict(buffer_ints)
 
-        if active > cfg.active_thresh:
+        # print(pecking, active)
+
+        if active > cfg.changes_thresh:
             if pecking > cfg.pecking_thresh:
-                self.score -= cfg.score_inc
+                self.score -= cfg.score_inc_dn
             else:
-                self.score += cfg.score_inc
+                self.score += cfg.score_inc_up
             self.normalize_score()
 
-    def update_score(self):
-        ints = [int(str(i), 16) for i in self.buffer]
-        l = [int(k / 16) for k in ints]
-        r = [k % 16 for k in ints]
+        self.last_NN_outputs = [pecking, active]
 
+    def get_diffs(self, l, r):
         last = [l[0], r[0]]
         diffs = [0, 0]
         for lp, rp in zip(l, r):
@@ -69,6 +67,15 @@ class KeyboardSensor(object):
             if rp != last[1]:
                 diffs[1] += 1
             last = [lp, rp]
+
+        return diffs
+
+    def update_score(self):
+        ints = [int(str(i), 16) for i in self.buffer]
+        l = [int(k / 16) for k in ints]
+        r = [k % 16 for k in ints]
+
+        diffs = self.get_diffs(l, r)
 
         # print(l)
         # print(r)
@@ -79,10 +86,10 @@ class KeyboardSensor(object):
             self.idle = True
         elif sumcnt < cfg.peck_sum_thresh:
             self.idle = False
-            self.score -= cfg.score_inc
+            self.score -= cfg.score_inc_dn
         else:
             self.idle = False
-            self.score += cfg.score_inc
+            self.score += cfg.score_inc_up
 
         self.normalize_score()
 
@@ -92,6 +99,9 @@ class KeyboardSensor(object):
 
     def get_score(self):
         return self.score
+
+    def set_score(self, newscore):
+        self.score = newscore
 
     def update_buffer(self):
         buffer_i = 0
@@ -103,7 +113,6 @@ class KeyboardSensor(object):
             buffer_i += 1
             buffer_i %= self.buffer_size
             next_step_s += time_step_s
-            self.update_score()
 
     def buffer_dump(self):
         return self.buffer
@@ -113,9 +122,25 @@ class LEDs(object):
     def __init__(self):
         self.leds = [LED(i) for i in cfg.LED_PINS]
         self.all_leds_off()
+        self.last_strobe = 0
+        self.ledthread = None
 
-    def strobe(self, runtime_s = 2):
+    def time_passed(self, timereq):
+        return (time.time() - self.last_strobe) > timereq
+
+    def all_leds_off(self):
+        [l.off() for l in self.leds]
+
+    def strobe(self, strobetime_s = 1):
+        if self.ledthread is not None:
+            self.ledthread.join()  # Join old thread if needed
+        self.last_zap = time.time()
+        self.ledthread = threading.Thread(target=self._strobe_thread, args=(strobetime_s,))
+        self.ledthread.start()
+
+    def _strobe_thread(self, runtime_s):
         tstart = time.time()
+        self.last_strobe = tstart
         stobe_delay = 1 / (2 * cfg.led_strobe_hz)
         while time.time() - tstart < runtime_s:
             self.leds[0].on()
@@ -124,19 +149,29 @@ class LEDs(object):
             self.leds[0].off()
             self.leds[1].on()
             time.sleep(stobe_delay)
-
         self.all_leds_off()
-
-    def all_leds_off(self):
-        [l.off() for l in self.leds]
 
 
 class Zapper(object):
     def __init__(self):
         self.zap = LED(cfg.SHOCK_PIN)
         self.zap.off()
+        self.zapthread = None
+        self.last_zap = 0
 
-    def zap_dem(self, zaptime_s = 1):
+    def time_passed(self, timereq):
+        return (time.time() - self.last_zap) > timereq
+
+    def zap_it(self, zaptime_s = 1):
+        if self.zapthread is not None:
+            self.zapthread.join()  # Join old thread if needed
+        self.last_zap = time.time()
+        self.zapthread = threading.Thread(target=self._zap_thread, args=(zaptime_s,))
+        self.zapthread.start()
+
+    def _zap_thread(self, zaptime):
+        tstart = time.time()
         self.zap.on()
-        time.sleep(zaptime_s)
+        while time.time() - tstart < zaptime:
+            time.sleep(0.1)
         self.zap.off()
