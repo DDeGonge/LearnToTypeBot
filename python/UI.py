@@ -3,6 +3,8 @@ import random
 import time
 import os
 import Config as cfg
+import numpy as np
+from scipy.interpolate import interp1d
 
 os.putenv('SDL_FBDEV', '/dev/fb1')
 pygame.init()
@@ -48,6 +50,9 @@ class Button:
 
     def check_collision(self, cur):
         return self.rect.collidepoint(cur)
+
+    def update_position(self, newpos):
+        self.location = newpos
 
 
 class Meter:
@@ -292,13 +297,15 @@ class TypeGame(Page):
                     self.strikes += 1
                     self.speaker.play_strike()
                     if self.strikes >= 3:
-                        self.speaker.play_loser()
                         self.gameover = True
-                        self.score_primer = Text('SCORE', 240, 100, fsize=36)
-                        self.score_text = Text(str(self.words_correct), 240, 140, fsize=24)
-                        self.accuracy_text = Text('{}% ACCURACY'.format(self.accuracy), 240, 180, fsize=24)
+                        self.score_primer = Text('GAME OVER', 225, 100, fsize=40, color=(255,255,255))
+                        self.score_text = Text('SCORE: {}'.format(str(self.words_correct)), 225, 160, fsize=30, color=(255,255,255))
+                        self.accuracy_text = Text('ACCURACY: {}%'.format(round(100*self.accuracy, 1)), 225, 210, fsize=30, color=(255,255,255))
                 
-                if self.wpm < self.thresh:
+                # Play appropriate sound effect
+                if self.strikes >= 3:
+                    self.speaker.play_loser()
+                elif self.wpm < self.thresh:
                     self.speaker.play_strike()
                 else:
                     self.speaker.play_speedup()
@@ -307,12 +314,12 @@ class TypeGame(Page):
                 self.thresh += cfg.thresh_increment
         else:
             rect_overlay_size = (300,200)
-            l_offset = (480 - rect_overlay_size[0]) / 2
-            h_offset = (360 - rect_overlay_size[1]) / 2
+            l_offset = (450 - rect_overlay_size[0]) / 2
+            h_offset = (300 - rect_overlay_size[1]) / 2
             pygame.draw.rect(screen, (0,0,0), pygame.Rect((l_offset, h_offset), rect_overlay_size))
-            self.score_primer.draw()
-            self.score_text.draw()
-            self.accuracy_text.draw()
+            self.score_primer.draw(screen)
+            self.score_text.draw(screen)
+            self.accuracy_text.draw(screen)
 
 
     def correct_input(self):
@@ -387,16 +394,36 @@ class TypeGame(Page):
 
 class Dumb(Page):
     buttons = {
-        'back': Button('assets/back.png', 30, 42)
+        'back': Button('assets/back.png', 30, 42),
+        'ree': Button('assets/dingding.png', -50, -50),
     }
     def __init__(self, s):
         self.speaker = s
-        self.reset()
+        self.gen_ree_function()
 
     def reset(self):
-        pass
+        self.start_time = time.time()
+        self.speaker.play_reee()
+
+    def gen_ree_function(self):
+        reenp = np.array(cfg.ree_positionz)
+        arr_time = reenp[:,0]
+        arr_x = reenp[:,1]
+        arr_y = reenp[:,2]
+
+        self.end_time = arr_time[-1]
+        self.reefunc_x = interp1d(arr_time, arr_x)
+        self.reefunc_y = interp1d(arr_time, arr_y)
+
+    def update_dingding_position(self):
+        t_elapsed = time.time() - self.start_time
+        if t_elapsed < self.end_time:
+            new_x = self.reefunc_x(t_elapsed)
+            new_y = self.reefunc_y(t_elapsed)
+            self.buttons['ree'].update_position((new_x, new_y))
 
     def display_screen(self, screen):
+        self.update_dingding_position()
         for b in self.buttons.values():
             b.draw(screen)
 
