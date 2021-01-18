@@ -321,7 +321,6 @@ class TypeGame(Page):
             self.score_text.draw(screen)
             self.accuracy_text.draw(screen)
 
-
     def correct_input(self):
         self.words_correct += 1
         self.correct_word_history.append(time.time())
@@ -332,7 +331,6 @@ class TypeGame(Page):
             self.leds.strobe(0.2)
         if self.accuracymode and self.zapper.time_passed(cfg.zaptime_s):
             self.zapper.zap_it(cfg.zaptime_s)
-
 
     def increment_buffer(self):
         self.typed_word = ''
@@ -366,7 +364,6 @@ class TypeGame(Page):
             else:
                 self.typed_word += chr(event.key)
                 self.cursor_index += 1
-
 
     def fill_word_buffer(self):
         while len(self.next_words) < 5:
